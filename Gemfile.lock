@@ -1,9 +1,9 @@
 GIT
   remote: git@github.com:wongatech/pantry_daemon_common.git
-  revision: 0feea3c0a4fc488b7eaacd5fe9de364fbdd52e34
-  tag: v0.1.7
+  revision: c7c38e2c1effcee4107d99de9f162f44cbf94541
+  tag: v0.2.4
   specs:
-    pantry_daemon_common (0.1.7)
+    pantry_daemon_common (0.2.4)
       aws-sdk
       daemons
       em-winrm
@@ -28,7 +28,7 @@ GEM
     akami (1.2.1)
       gyoku (>= 0.4.0)
       nokogiri
-    aws-sdk (1.33.0)
+    aws-sdk (1.34.0)
       json (~> 1.4)
       nokogiri (>= 1.4.4)
       uuidtools (~> 2.1)
