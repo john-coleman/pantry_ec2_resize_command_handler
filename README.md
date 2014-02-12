@@ -1,1 +1,1 @@
-<Insert spiel here about your daemon. This is a template>
+This daemon is used to resize EC2 images (to change the flavor).
