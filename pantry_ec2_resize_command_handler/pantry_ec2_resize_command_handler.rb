@@ -9,16 +9,13 @@ module Wonga
       end
 
       def handle_message(message)
-        @logger.info message.inspect
-        return unless @aws_resource.stop(message)
-        @logger.info 'Instance stopped'
         ec2 = @aws_resource.find_server_by_id(message['instance_id'])
         if ec2.status == :terminated
           send_error_message(message)
           return
         end
         ec2.instance_type = message['flavor']
-        @logger.info 'Changed flavor and going to publish the event'
+        @logger.info 'Flavor changed'
         @publisher.publish(message)
       end
 

@@ -13,11 +13,6 @@ describe Wonga::Daemon::PantryEc2ResizeCommandHandler do
   it_behaves_like 'handler'
 
   describe '#handle_message' do
-    it 'exits when the instance is terminated or not found' do
-      expect(aws_resource).to receive(:stop).with(message).and_return(nil)
-      subject.handle_message(message)
-    end
-
     describe 'when the instance is stopped' do
       before(:each) do
         allow(aws_resource).to receive(:stop).with(message).and_return(true)
