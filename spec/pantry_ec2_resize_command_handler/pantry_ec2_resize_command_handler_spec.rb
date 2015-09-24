@@ -1,110 +1,58 @@
 require 'spec_helper'
 require_relative '../../pantry_ec2_resize_command_handler/pantry_ec2_resize_command_handler'
+require 'wonga/daemon/aws_resource'
+require 'wonga/daemon/publisher'
 
-describe Wonga::Daemon::PantryEc2ResizeCommandHandler do
-  let(:aws_resource) { instance_spy('Wonga::Daemon::AWSResource', stop: true, find_server_by_id: instance, status: instance.status) }
-  let(:instance) { instance_spy('AWS::EC2::Instance', status: :running) }
-  let(:logger) { instance_spy('Logger') }
-  let(:publisher) { instance_double('Wonga::Daemon::Publisher', publish: true) }
-  let(:error_publisher) { instance_double('Wonga::Daemon::Publisher', publish: true) }
+RSpec.describe Wonga::Daemon::PantryEc2ResizeCommandHandler do
+  let(:logger) { instance_spy(Logger) }
+  let(:publisher) { instance_double(Wonga::Daemon::Publisher, publish: true) }
+  let(:error_publisher) { instance_double(Wonga::Daemon::Publisher) }
   let(:message) do
     { 'flavor' =>  'm1.medium', 'id' => 1, 'instance_id' => 'i-ebf1a1a5' }
   end
-  subject { Wonga::Daemon::PantryEc2ResizeCommandHandler.new(publisher, error_publisher, logger, aws_resource) }
+  let(:aws_resource) { Wonga::Daemon::AWSResource.new(error_publisher, logger, aws_ec2_resource) }
+
+  subject { Wonga::Daemon::PantryEc2ResizeCommandHandler.new(publisher, logger, aws_resource) }
   it_behaves_like 'handler'
+  let(:instance_response) { { reservations: [{ instances: [instance_attributes] }] } }
+  let(:instance_attributes) { { instance_id: '100100', instance_type: 'm3.large' } }
+  let(:aws_ec2_resource) { Aws::EC2::Resource.new }
+
+  before(:each) do
+    aws_ec2_resource.client.stub_responses(:describe_instances, instance_response)
+  end
 
   describe '#handle_message' do
-    before(:each) do
-      allow(aws_resource).to receive(:stop).with(message).and_return(true)
-      allow(instance).to receive(:instance_type=).with(message['flavor'])
-      allow(aws_resource).to receive(:find_server_by_id).and_return(instance)
-    end
+    context 'instance can be stopped' do
+      before(:each) do
+        allow(aws_resource).to receive(:stop).and_return(true)
+      end
 
-    context 'for terminated instance' do
-      let(:instance) { instance_spy('AWS::EC2::Instance', status: :terminated) }
-
-      it 'logs error message' do
-        expect(logger).to receive(:error).with(/Instance is terminated/)
+      it 'changes the instance_type' do
+        expect(aws_ec2_resource.client).to receive(:modify_instance_attribute).with(hash_including(instance_type: { value: 't2.medium' }))
+        allow(publisher).to receive(:publish)
         subject.handle_message(message)
       end
 
-      it 'publishes message to error topic' do
+      it 'publishes the message' do
+        expect(publisher).to receive(:publish)
         subject.handle_message(message)
-        expect(error_publisher).to have_received(:publish).with(message)
+      end
+    end
+
+    context 'instance cannot be stopped' do
+      before(:each) do
+        allow(aws_resource).to receive(:stop).and_return(false)
+      end
+
+      it 'does not change instance type' do
+        expect(aws_ec2_resource.client).not_to receive(:modify_instance_attribute)
+        subject.handle_message(message)
       end
 
       it 'does not publish message to event topic' do
         subject.handle_message(message)
         expect(publisher).to_not have_received(:publish)
-      end
-    end
-
-    context 'for terminating instance' do
-      let(:instance) { instance_spy('AWS::EC2::Instance', status: :shutting_down) }
-
-      it 'logs error message' do
-        expect(logger).to receive(:error).with(/Instance is shutting down/)
-        subject.handle_message(message)
-      end
-
-      it 'publishes message to error topic' do
-        subject.handle_message(message)
-        expect(error_publisher).to have_received(:publish).with(message)
-      end
-
-      it 'does not publish message to event topic' do
-        subject.handle_message(message)
-        expect(publisher).to_not have_received(:publish)
-      end
-    end
-
-    context 'for non-terminated instance' do
-      it 'logs info message' do
-        expect(logger).to receive(:info).with(/Stopping Instance/)
-        subject.handle_message(message)
-      end
-
-      it 'stops the instance' do
-        expect(aws_resource).to receive(:stop).with(message)
-        subject.handle_message(message)
-      end
-
-      context 'instance can be stopped' do
-        it 'logs info message' do
-          expect(logger).to receive(:info).with(/Stopping Instance/)
-          expect(logger).to receive(:info).with(/Instance stopped/)
-          subject.handle_message(message)
-        end
-
-        it 'changes the instance_type' do
-          allow(publisher).to receive(:publish)
-          subject.handle_message(message)
-        end
-
-        it 'publishes the message' do
-          expect(publisher).to receive(:publish)
-          subject.handle_message(message)
-        end
-      end
-      context 'instance cannot be stopped' do
-        before(:each) do
-          allow(aws_resource).to receive(:stop).with(message).and_return(false)
-        end
-
-        it 'logs error message' do
-          expect(logger).to receive(:error).with(/Instance could not be stopped/)
-          subject.handle_message(message)
-        end
-
-        it 'does not publish message to error topic' do
-          subject.handle_message(message)
-          expect(error_publisher).to_not have_received(:publish)
-        end
-
-        it 'does not publish message to event topic' do
-          subject.handle_message(message)
-          expect(publisher).to_not have_received(:publish)
-        end
       end
     end
   end

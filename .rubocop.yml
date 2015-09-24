@@ -21,7 +21,7 @@ Style/MultilineOperationIndentation:
   Enabled: false
 
 Metrics/LineLength:
-  Max: 180
+  Max: 202
 Metrics/MethodLength:
   Max: 35
 Metrics/ClassLength:
